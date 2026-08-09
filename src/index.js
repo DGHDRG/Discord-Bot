@@ -23,16 +23,24 @@ if (process.env.WEBHOOK_ID && process.env.WEBHOOK_TOKEN) {
     }
 }
 
+// Helper function to safely create webhook clients
+function createWebhookClient(webhookData) {
+    if (!webhookData || !webhookData.id || !webhookData.token) {
+        return null; // Return null if webhook is not configured
+    }
+    try {
+        return new Discord.WebhookClient({
+            id: webhookData.id,
+            token: webhookData.token,
+        });
+    } catch (err) {
+        console.warn(`Failed to create webhook client:`, err.message);
+        return null;
+    }
+}
 
-const startLogs = new Discord.WebhookClient({
-    id: webhook.startLogs.id,
-    token: webhook.startLogs.token,
-});
-
-const shardLogs = new Discord.WebhookClient({
-    id: webhook.shardLogs.id,
-    token: webhook.shardLogs.token,
-});
+const startLogs = createWebhookClient(webhook.startLogs);
+const shardLogs = createWebhookClient(webhook.shardLogs);
 
 const manager = new Discord.ShardingManager('./src/bot.js', {
     totalShards: 'auto',
@@ -70,10 +78,12 @@ manager.on('shardCreate', shard => {
             }
         ])
         .setColor(config.colors.normal)
-    startLogs.send({
-        username: 'Bot Logs',
-        embeds: [embed],
-    });
+    if (startLogs) {
+        startLogs.send({
+            username: 'Bot Logs',
+            embeds: [embed],
+        }).catch(err => console.warn('Failed to send startLogs webhook:', err.message));
+    }
 
     console.log(chalk.blue(chalk.bold(`System`)), (chalk.white(`>>`)), (chalk.green(`Starting`)), chalk.red(`Shard #${shard.id + 1}`), (chalk.white(`...`)))
     console.log(`\u001b[0m`);
@@ -88,10 +98,12 @@ manager.on('shardCreate', shard => {
                 },
             ])
             .setColor(config.colors.normal)
-        shardLogs.send({
-            username: 'Bot Logs',
-            embeds: [embed]
-        });
+        if (shardLogs) {
+            shardLogs.send({
+                username: 'Bot Logs',
+                embeds: [embed]
+            }).catch(err => console.warn('Failed to send shardLogs webhook:', err.message));
+        }
 
         if (process.exitCode === null) {
             const embed = new Discord.EmbedBuilder()
@@ -107,10 +119,12 @@ manager.on('shardCreate', shard => {
                     }
                 ])
                 .setColor(config.colors.normal)
-            shardLogs.send({
-                username: 'Bot Logs',
-                embeds: [embed]
-            });
+            if (shardLogs) {
+                shardLogs.send({
+                    username: 'Bot Logs',
+                    embeds: [embed]
+                }).catch(err => console.warn('Failed to send shardLogs webhook:', err.message));
+            }
         }
     });
 
@@ -119,20 +133,24 @@ manager.on('shardCreate', shard => {
             .setTitle(`🚨・Shard ${shard.id + 1}/${manager.totalShards} disconnected`)
             .setDescription("Dumping socket close event...")
             .setColor(config.colors.normal)
-        shardLogs.send({
-            username: 'Bot Logs',
-            embeds: [embed],
-        });
+        if (shardLogs) {
+            shardLogs.send({
+                username: 'Bot Logs',
+                embeds: [embed],
+            }).catch(err => console.warn('Failed to send shardLogs webhook:', err.message));
+        }
     });
 
     shard.on("shardReconnecting", () => {
         const embed = new Discord.EmbedBuilder()
             .setTitle(`🚨・Reconnecting shard ${shard.id + 1}/${manager.totalShards}`)
             .setColor(config.colors.normal)
-        shardLogs.send({
-            username: 'Bot Logs',
-            embeds: [embed],
-        });
+        if (shardLogs) {
+            shardLogs.send({
+                username: 'Bot Logs',
+                embeds: [embed],
+            }).catch(err => console.warn('Failed to send shardLogs webhook:', err.message));
+        }
     });
 });
 
@@ -141,15 +159,8 @@ manager.spawn();
 
 
 // Webhooks
-const consoleLogs = new Discord.WebhookClient({
-    id: webhook.consoleLogs.id,
-    token: webhook.consoleLogs.token,
-});
-
-const warnLogs = new Discord.WebhookClient({
-    id: webhook.warnLogs.id,
-    token: webhook.warnLogs.token,
-});
+const consoleLogs = createWebhookClient(webhook.consoleLogs);
+const warnLogs = createWebhookClient(webhook.warnLogs);
 
 process.on('unhandledRejection', error => {
     console.error('Unhandled promise rejection:', error);
@@ -168,13 +179,15 @@ process.on('unhandledRejection', error => {
                 value: error.stack ? Discord.codeBlock(error.stack) : "No stack error",
             }
         ])
-    consoleLogs.send({
-        username: 'Bot Logs',
-        embeds: [embed],
-    }).catch(() => {
-        console.log('Error sending unhandled promise rejection to webhook')
-        console.log(error)
-    })
+    if (consoleLogs) {
+        consoleLogs.send({
+            username: 'Bot Logs',
+            embeds: [embed],
+        }).catch(() => {
+            console.log('Error sending unhandled promise rejection to webhook')
+            console.log(error)
+        })
+    }
 });
 
 process.on('warning', warn => {
@@ -187,11 +200,14 @@ process.on('warning', warn => {
                 value: `\`\`\`${warn}\`\`\``,
             },
         ])
-    warnLogs.send({
-        username: 'Bot Logs',
-        embeds: [embed],
-    }).catch(() => {
-        console.log('Error sending warning to webhook')
-        console.log(warn)
-    })
+    if (warnLogs) {
+        warnLogs.send({
+            username: 'Bot Logs',
+            embeds: [embed],
+        }).catch(() => {
+            console.log('Error sending warning to webhook')
+            console.log(warn)
+        })
+    }
 });
+
