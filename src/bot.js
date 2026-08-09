@@ -129,21 +129,30 @@ if (process.env.WEBHOOK_ID && process.env.WEBHOOK_TOKEN) {
     }
 }
 
+// Helper function to safely create webhook clients
+function createWebhookClient(webhookData) {
+    if (!webhookData || !webhookData.id || !webhookData.token) {
+        return null;
+    }
+    try {
+        return new Discord.WebhookClient({
+            id: webhookData.id,
+            token: webhookData.token,
+        });
+    } catch (err) {
+        console.warn(`Failed to create webhook client:`, err.message);
+        return null;
+    }
+}
+
 client.commands = new Discord.Collection();
 client.playerManager = new Map();
 client.triviaManager = new Map();
 client.queue = new Map();
 
 // Webhooks
-const consoleLogs = new Discord.WebhookClient({
-    id: client.webhooks.consoleLogs.id,
-    token: client.webhooks.consoleLogs.token,
-});
-
-const warnLogs = new Discord.WebhookClient({
-    id: client.webhooks.warnLogs.id,
-    token: client.webhooks.warnLogs.token,
-});
+const consoleLogs = createWebhookClient(client.webhooks.consoleLogs);
+const warnLogs = createWebhookClient(client.webhooks.warnLogs);
 
 // Load handlers
 fs.readdirSync('./src/handlers').forEach((dir) => {
@@ -172,13 +181,15 @@ process.on('unhandledRejection', error => {
             }
         ])
         .setColor(client.config.colors.normal)
-    consoleLogs.send({
-        username: 'Bot Logs',
-        embeds: [embed],
-    }).catch(() => {
-        console.log('Error sending unhandledRejection to webhook')
-        console.log(error)
-    })
+    if (consoleLogs) {
+        consoleLogs.send({
+            username: 'Bot Logs',
+            embeds: [embed],
+        }).catch(() => {
+            console.log('Error sending unhandledRejection to webhook')
+            console.log(error)
+        })
+    }
 });
 
 process.on('warning', warn => {
@@ -192,13 +203,15 @@ process.on('warning', warn => {
             },
         ])
         .setColor(client.config.colors.normal)
-    warnLogs.send({
-        username: 'Bot Logs',
-        embeds: [embed],
-    }).catch(() => {
-        console.log('Error sending warning to webhook')
-        console.log(warn)
-    })
+    if (warnLogs) {
+        warnLogs.send({
+            username: 'Bot Logs',
+            embeds: [embed],
+        }).catch(() => {
+            console.log('Error sending warning to webhook')
+            console.log(warn)
+        })
+    }
 });
 
 client.on(Discord.ShardEvents.Error, error => {
@@ -219,8 +232,11 @@ client.on(Discord.ShardEvents.Error, error => {
             }
         ])
         .setColor(client.config.colors.normal)
-    consoleLogs.send({
-        username: 'Bot Logs',
-        embeds: [embed],
-    });
+    if (consoleLogs) {
+        consoleLogs.send({
+            username: 'Bot Logs',
+            embeds: [embed],
+        }).catch(err => console.warn('Failed to send consoleLogs webhook:', err.message));
+    }
 });
+
