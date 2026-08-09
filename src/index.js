@@ -1,6 +1,6 @@
 const Discord = require('discord.js');
 const chalk = require('chalk');
-requiif (process.env.NODE_ENV !== 'production') {
+if requiif (process.env.NODE_ENV !== 'production') {
  require('dotenv').config();
 }
 const axios = require('axios');
