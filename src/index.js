@@ -1,6 +1,8 @@
 const Discord = require('discord.js');
 const chalk = require('chalk');
-requiif (process.env.NODE_ENV!== 'production"){require ('dotenv').config('/env');}
+requiif (process.env.NODE_ENV !== 'production') {
+ require('dotenv').config();
+}
 const axios = require('axios');
 // Check if is up to date
 const { version } = require('.././package.json');
