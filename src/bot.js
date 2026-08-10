@@ -1,12 +1,6 @@
 const Discord = require('discord.js');
 const fs = require('fs');
 
-const { Manager } = require("erela.js");
-const Spotify = require("erela.js-spotify");
-const Facebook = require("erela.js-facebook");
-const Deezer = require("erela.js-deezer");
-const AppleMusic = require("erela.js-apple");
-
 // Discord client
 const client = new Discord.Client({
     allowedMentions: {
@@ -49,68 +43,70 @@ const client = new Discord.Client({
     restTimeOffset: 0
 });
 
+// Initialize music player ONLY if Lavalink is configured
+const hasMusicConfig = process.env.LAVALINK_HOST && process.env.LAVALINK_PASSWORD;
 
-const clientID = process.env.SPOTIFY_CLIENT_ID;
-const clientSecret = process.env.SPOTIFY_CLIENT_SECRET;
-if (clientID && clientSecret) {
-    // Lavalink client
-    client.player = new Manager({
-        plugins: [
+if (hasMusicConfig) {
+    try {
+        const { Manager } = require("erela.js");
+        const Spotify = require("erela.js-spotify");
+        const Facebook = require("erela.js-facebook");
+        const Deezer = require("erela.js-deezer");
+        const AppleMusic = require("erela.js-apple");
+
+        const clientID = process.env.SPOTIFY_CLIENT_ID;
+        const clientSecret = process.env.SPOTIFY_CLIENT_SECRET;
+        
+        const plugins = [
             new AppleMusic(),
             new Deezer(),
             new Facebook(),
-            new Spotify({
+        ];
+
+        if (clientID && clientSecret) {
+            plugins.push(new Spotify({
                 clientID,
                 clientSecret,
-            })
-        ],
-        nodes: [
-            {
-                host: process.env.LAVALINK_HOST || "lava.link",
-                port: parseInt(process.env.LAVALINK_PORT) || 80,
-                password: process.env.LAVALINK_PASSWORD || "CorwinDev",
-                secure: Boolean(process.env.LAVALINK_SECURE) || false
-            },
-            {
-                host: "lavalink.techpoint.world",
-                port: 80,
-                password: "techpoint"
-            },
-        ],
-        send(id, payload) {
-            const guild = client.guilds.cache.get(id);
-            if (guild) guild.shard.send(payload);
-        },
-    })
-
-} else {
-    // Lavalink client
-    client.player = new Manager({
-        plugins: [
-            new AppleMusic(),
-            new Deezer(),
-            new Facebook(),
-        ],
-        nodes: [
-            {
-                host: process.env.LAVALINK_HOST || "lava.link",
-                port: parseInt(process.env.LAVALINK_PORT) || 80,
-                password: process.env.LAVALINK_PASSWORD || "CorwinDev",
-                secure: Boolean(process.env.LAVALINK_SECURE) || false
-            },
-        ],
-        send(id, payload) {
-            const guild = client.guilds.cache.get(id);
-            if (guild) guild.shard.send(payload);
+            }));
         }
-    })
-}
-const events = fs.readdirSync(`./src/events/music`).filter(files => files.endsWith('.js'));
 
-for (const file of events) {
-    const event = require(`./events/music/${file}`);
-    client.player.on(file.split(".")[0], event.bind(null, client)).setMaxListeners(0);
-};
+        // Lavalink client
+        client.player = new Manager({
+            plugins,
+            nodes: [
+                {
+                    host: process.env.LAVALINK_HOST,
+                    port: parseInt(process.env.LAVALINK_PORT) || 80,
+                    password: process.env.LAVALINK_PASSWORD,
+                    secure: Boolean(process.env.LAVALINK_SECURE) || false
+                },
+            ],
+            send(id, payload) {
+                const guild = client.guilds.cache.get(id);
+                if (guild) guild.shard.send(payload);
+            },
+        });
+
+        // Load music events
+        const musicEventsPath = './src/events/music';
+        if (fs.existsSync(musicEventsPath)) {
+            const events = fs.readdirSync(musicEventsPath).filter(files => files.endsWith('.js'));
+            for (const file of events) {
+                const event = require(`./events/music/${file}`);
+                client.player.on(file.split(".")[0], event.bind(null, client)).setMaxListeners(0);
+            }
+        }
+
+        console.log('🎵 Music player initialized');
+    } catch (error) {
+        console.warn('⚠️ Failed to initialize music player:', error.message);
+        console.log('Bot will continue without music features');
+        client.player = null;
+    }
+} else {
+    console.log('⚠️ Music player disabled (LAVALINK_HOST not configured)');
+    client.player = null;
+}
 
 // Connect to database
 require("./database/connect")();
@@ -134,16 +130,22 @@ client.playerManager = new Map();
 client.triviaManager = new Map();
 client.queue = new Map();
 
-// Webhooks
-const consoleLogs = new Discord.WebhookClient({
-    id: client.webhooks.consoleLogs.id,
-    token: client.webhooks.consoleLogs.token,
-});
+// Webhooks - safely create webhook clients
+function createWebhookClient(webhookData) {
+    if (!webhookData || !webhookData.id || !webhookData.token) return null;
+    try {
+        return new Discord.WebhookClient({
+            id: webhookData.id,
+            token: webhookData.token,
+        });
+    } catch (err) {
+        console.warn(`Failed to create webhook client:`, err.message);
+        return null;
+    }
+}
 
-const warnLogs = new Discord.WebhookClient({
-    id: client.webhooks.warnLogs.id,
-    token: client.webhooks.warnLogs.token,
-});
+const consoleLogs = createWebhookClient(client.webhooks.consoleLogs);
+const warnLogs = createWebhookClient(client.webhooks.warnLogs);
 
 // Load handlers
 fs.readdirSync('./src/handlers').forEach((dir) => {
@@ -172,13 +174,15 @@ process.on('unhandledRejection', error => {
             }
         ])
         .setColor(client.config.colors.normal)
-    consoleLogs.send({
-        username: 'Bot Logs',
-        embeds: [embed],
-    }).catch(() => {
-        console.log('Error sending unhandledRejection to webhook')
-        console.log(error)
-    })
+    if (consoleLogs) {
+        consoleLogs.send({
+            username: 'Bot Logs',
+            embeds: [embed],
+        }).catch(() => {
+            console.log('Error sending unhandledRejection to webhook')
+            console.log(error)
+        })
+    }
 });
 
 process.on('warning', warn => {
@@ -192,13 +196,15 @@ process.on('warning', warn => {
             },
         ])
         .setColor(client.config.colors.normal)
-    warnLogs.send({
-        username: 'Bot Logs',
-        embeds: [embed],
-    }).catch(() => {
-        console.log('Error sending warning to webhook')
-        console.log(warn)
-    })
+    if (warnLogs) {
+        warnLogs.send({
+            username: 'Bot Logs',
+            embeds: [embed],
+        }).catch(() => {
+            console.log('Error sending warning to webhook')
+            console.log(warn)
+        })
+    }
 });
 
 client.on(Discord.ShardEvents.Error, error => {
@@ -219,8 +225,10 @@ client.on(Discord.ShardEvents.Error, error => {
             }
         ])
         .setColor(client.config.colors.normal)
-    consoleLogs.send({
-        username: 'Bot Logs',
-        embeds: [embed],
-    });
+    if (consoleLogs) {
+        consoleLogs.send({
+            username: 'Bot Logs',
+            embeds: [embed],
+        });
+    }
 });
