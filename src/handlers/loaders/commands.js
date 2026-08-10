@@ -5,10 +5,17 @@ const chalk = require('chalk');
 const fs = require('fs');
 
 module.exports = (client) => {
-    const interactionLogs = new Discord.WebhookClient({
-        id: client.webhooks.interactionLogs.id,
-        token: client.webhooks.interactionLogs.token,
-    });
+    let interactionLogs = null;
+    try {
+        if (client.webhooks.interactionLogs && client.webhooks.interactionLogs.id && client.webhooks.interactionLogs.token) {
+            interactionLogs = new Discord.WebhookClient({
+                id: client.webhooks.interactionLogs.id,
+                token: client.webhooks.interactionLogs.token,
+            });
+        }
+    } catch (err) {
+        console.warn('interactionLogs webhook unavailable');
+    }
 
     const commands = [];
 
@@ -34,10 +41,12 @@ module.exports = (client) => {
             const embed = new Discord.EmbedBuilder()
                 .setDescription(`Started refreshing application (/) commands.`)
                 .setColor(client.config.colors.normal)
-            interactionLogs.send({
-                username: 'Bot Logs',
-                embeds: [embed]
-            });
+            if (interactionLogs) {
+                interactionLogs.send({
+                    username: 'Bot Logs',
+                    embeds: [embed]
+                }).catch(() => {});
+            }
 
             await rest.put(
                 Routes.applicationCommands(client.config.discord.id),
@@ -47,10 +56,12 @@ module.exports = (client) => {
             const embedFinal = new Discord.EmbedBuilder()
                 .setDescription(`Successfully reloaded ${commands.length} application (/) commands.`)
                 .setColor(client.config.colors.normal)
-            interactionLogs.send({
-                username: 'Bot Logs',
-                embeds: [embedFinal]
-            });
+            if (interactionLogs) {
+                interactionLogs.send({
+                    username: 'Bot Logs',
+                    embeds: [embedFinal]
+                }).catch(() => {});
+            }
 
         } catch (error) {
             console.log(error);
