@@ -3,27 +3,31 @@ const chalk = require('chalk');
 const { random } = require('mathjs');
 
 module.exports = async (client) => {
-    const startLogs = new Discord.WebhookClient({
-        id: client.webhooks.startLogs.id,
-        token: client.webhooks.startLogs.token,
-    });
-
     console.log(`\u001b[0m`);
     console.log(chalk.blue(chalk.bold(`System`)), (chalk.white(`>>`)), chalk.red(`Shard #${client.shard.ids[0] + 1}`), chalk.green(`is ready!`))
     console.log(chalk.blue(chalk.bold(`Bot`)), (chalk.white(`>>`)), chalk.green(`Started on`), chalk.red(`${client.guilds.cache.size}`), chalk.green(`servers!`))
 
-    let embed = new Discord.EmbedBuilder()
-        .setTitle(`🆙・Finishing shard`)
-        .setDescription(`A shard just finished`)
-        .addFields(
-            { name: "🆔┆ID", value: `${client.shard.ids[0] + 1}/${client.options.shardCount}`, inline: true },
-            { name: "📃┆State", value: `Ready`, inline: true },
-        )
-        .setColor(client.config.colors.normal)
-    startLogs.send({
-        username: 'Bot Logs',
-        embeds: [embed],
-    });
+    // Only send to webhook if it's configured
+    const webhookData = client.webhooks && client.webhooks.startLogs;
+    if (webhookData && webhookData.id && webhookData.token) {
+        const startLogs = new Discord.WebhookClient({
+            id: webhookData.id,
+            token: webhookData.token,
+        });
+
+        let embed = new Discord.EmbedBuilder()
+            .setTitle(`🆙・Finishing shard`)
+            .setDescription(`A shard just finished`)
+            .addFields(
+                { name: "🆔┆ID", value: `${client.shard.ids[0] + 1}/${client.options.shardCount}`, inline: true },
+                { name: "📃┆State", value: `Ready`, inline: true },
+            )
+            .setColor(client.config.colors.normal)
+        startLogs.send({
+            username: 'Bot Logs',
+            embeds: [embed],
+        }).catch(err => console.warn('Failed to send startLogs webhook:', err.message));
+    }
 
     setInterval(async function () {
         const promises = [
