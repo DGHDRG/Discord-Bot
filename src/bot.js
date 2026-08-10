@@ -43,6 +43,10 @@ const client = new Discord.Client({
     restTimeOffset: 0
 });
 
+// Suppress verbose discord.js logging (debug/info spam) while keeping warnings visible
+client.on('debug', () => {}); // Disable debug logs
+client.on('warn', (msg) => console.warn('[discord.js WARN]', msg)); // Keep warnings only
+
 // Initialize music player ONLY if Lavalink is configured
 const hasMusicConfig = process.env.LAVALINK_HOST && process.env.LAVALINK_PASSWORD;
 
