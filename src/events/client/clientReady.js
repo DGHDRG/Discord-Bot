@@ -53,6 +53,7 @@ module.exports = async (client) => {
             })
     }, 50000)
 
-    client.player.init(client.user.id);
+    if (client.player) {
+client.player.init(client.user.id);
 }
 
