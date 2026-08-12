@@ -331,7 +331,7 @@ module.exports = async (client, message) => {
   }
 
   if (!guildSettings || !guildSettings.Prefix) {
-    var prefix = client.config.Discord.prefix;
+    var prefix = client.config.discord.prefix;
   } else {
     var prefix = guildSettings.Prefix;
   }
