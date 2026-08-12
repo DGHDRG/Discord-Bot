@@ -2,8 +2,10 @@ const mongoose = require('mongoose');
 const chalk = require('chalk');
 
 async function connect() {
+    const mongoUri = process.env.MONGO_TOKEN || process.env.MONGODB_URI;
+
     // Check if MongoDB is configured
-    if (!process.env.MONGO_TOKEN) {
+    if (!mongoUri) {
         console.log(chalk.yellow('⚠️ MongoDB is disabled (MONGO_TOKEN not configured)'));
         console.log(chalk.yellow('Database features will be unavailable'));
         return;
@@ -12,7 +14,7 @@ async function connect() {
     mongoose.set('strictQuery', false);
     try {
         console.log(chalk.blue(chalk.bold(`Database`)), (chalk.white(`>>`)), chalk.red(`MongoDB`), chalk.green(`is connecting...`))
-        await mongoose.connect(process.env.MONGO_TOKEN, {
+        await mongoose.connect(mongoUri, {
             useNewUrlParser: true,
             useUnifiedTopology: true,
         });
