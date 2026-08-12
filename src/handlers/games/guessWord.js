@@ -7,7 +7,7 @@ module.exports = async (client) => {
     if (message.author.bot || message.channel.type === Discord.ChannelType.DM) return;
 
     let wordList = client.config.wordList;
-    wordList = wordList.split("\n");
+    // wordList is already an array, no split needed
 
     const data = await Schema.findOne({ Guild: message.guild.id, Channel: message.channel.id });
 
