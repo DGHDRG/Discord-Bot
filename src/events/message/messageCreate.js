@@ -430,6 +430,16 @@ module.exports = async (client, message) => {
       });
     }
   }
+
+  const builtInCommand = client.commands.get(command);
+  if (builtInCommand) {
+    try {
+      return await builtInCommand.run(client, message, args);
+    } catch (error) {
+      console.error(`Error executing command ${command}:`, error);
+      return message.reply("There was an error executing that command!");
+    }
+  }
 };
 
 
