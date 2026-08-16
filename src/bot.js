@@ -112,8 +112,41 @@ if (hasMusicConfig) {
     client.player = null;
 }
 
-// Connect to database
-require("./database/connect")();
+// Connect to database - Support both PostgreSQL and MongoDB
+async function initializeDatabase() {
+    const databaseUrl = process.env.DATABASE_URL;
+    const mongoToken = process.env.MONGO_TOKEN || process.env.MONGODB_URI;
+
+    // Prefer PostgreSQL if DATABASE_URL is set
+    if (databaseUrl && databaseUrl.includes('postgres')) {
+        console.log('📦 Using PostgreSQL');
+        try {
+            const { connectPostgres } = require("./database/connectPostgres");
+            await connectPostgres();
+        } catch (err) {
+            console.error('Failed to connect to PostgreSQL:', err.message);
+            // Fallback to MongoDB
+            if (mongoToken) {
+                console.log('Falling back to MongoDB...');
+                require("./database/connect")();
+            }
+        }
+    } 
+    // Fall back to MongoDB if configured
+    else if (mongoToken) {
+        console.log('📦 Using MongoDB');
+        require("./database/connect")();
+    }
+    // No database configured
+    else {
+        console.log('⚠️ No database configured. Set DATABASE_URL (PostgreSQL) or MONGO_TOKEN (MongoDB)');
+    }
+}
+
+// Initialize database
+initializeDatabase().catch(err => {
+    console.error('Database initialization error:', err.message);
+});
 
 // Client settings
 client.config = require('./config/bot');
@@ -236,3 +269,4 @@ client.on(Discord.ShardEvents.Error, error => {
         });
     }
 });
+
